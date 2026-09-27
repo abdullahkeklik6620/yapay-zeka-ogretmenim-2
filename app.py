@@ -73,10 +73,8 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz veya fotoğraf yükle
         image_obj = Image.open(uploaded_file)
         
     # Kullanıcı mesajını ekrana ve geçmişe ekle
-    user_content = prompt
     if image_obj:
-        user_content = f"📸 [Fotoğraf Yüklendi]\n\n{prompt}"
-        st.session_state.messages.append({"role": "user", "content": user_content})
+        st.session_state.messages.append({"role": "user", "content": f"📸 [Fotoğraf Yüklendi]\n\n{prompt}"})
         with st.chat_message("user"):
             st.image(image_obj, caption="Yüklenen Soru Fotoğrafı", use_container_width=True)
             st.markdown(prompt)
@@ -88,8 +86,8 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz veya fotoğraf yükle
     # Yapay Zeka Yanıtı (Canlı Akış / Streaming)
     with st.chat_message("assistant"):
         def generate_response():
-            # Güncel SDK standart isimleri
-            models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash']
+            # Google API'nin resmi olarak önerdiği model isimleri
+            models_to_try = ['gemini-3.8-flash', 'models/gemini-3.8-flash']
             
             # İçerik hazırlığı
             contents_payload = [teacher_instruction, prompt]
