@@ -2,6 +2,7 @@ import streamlit as st
 from google import genai
 from PIL import Image
 import streamlit.components.v1 as components
+import time
 
 # Sayfa Yapılandırması
 st.set_page_config(page_title="Yapay Zeka Özel Öğretmenim", page_icon="🎓", layout="centered")
@@ -86,15 +87,12 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz veya fotoğraf yükle
     # Yapay Zeka Yanıtı (Canlı Akış / Streaming)
     with st.chat_message("assistant"):
         def generate_response():
-            # Google API'nin resmi olarak önerdiği model isimleri
-            models_to_try = ['gemini-3.8-flash', 'models/gemini-3.8-flash']
+            models_to_try = ['gemini-3.8-flash']
             
-            # İçerik hazırlığı
             contents_payload = [teacher_instruction, prompt]
             if image_obj:
                 contents_payload.append(image_obj)
             
-            last_error = None
             for model_name in models_to_try:
                 try:
                     response_stream = client.models.generate_content_stream(
@@ -106,15 +104,16 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz veya fotoğraf yükle
                             yield chunk.text
                     return
                 except Exception as e:
-                    last_error = e
-                    continue
-            
-            yield f"\n\n*Hata oluştu: {last_error}*"
+                    err_msg = str(e)
+                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                        yield "\n\n⏳ *Çok fazla soru sorulduğu için ücretsiz dakikalık kota sınırına ulaşıldı. Lütfen 30 saniye bekleyip tekrar deneyiniz.*"
+                    else:
+                        yield f"\n\n*Hata oluştu: {e}*"
 
         full_response = st.write_stream(generate_response)
         
-        # Yanıt başarıyla alındıysa seslendir
-        if full_response and not full_response.startswith("\n\n*Hata oluştu:"):
+        # Yanıt başarıyla alındıysa ve kota hatası değilse seslendir
+        if full_response and not "kota sınırına ulaşıldı" in full_response and not full_response.startswith("\n\n*Hata oluştu:"):
             play_audio_script(full_response)
     
     # Yanıtı geçmişe ekle
