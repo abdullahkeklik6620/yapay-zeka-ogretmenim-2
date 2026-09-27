@@ -1,8 +1,18 @@
 import streamlit as st
 from google import genai
+import streamlit.components.v1 as components
 
 # Sayfa Yapılandırması
 st.set_page_config(page_title="Yapay Zeka Özel Öğretmenim", page_icon="🎓", layout="centered")
+
+# Menü ve başlık gizleme (Profesyonel Görünüm)
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
 
 st.title("🎓 Yapay Zeka Özel Öğretmenim")
 st.write("Matematik, Fizik, Kimya, Biyoloji, Türkçe, Tarih... İstediğin her dersi doğrudan sorabilirsin!")
@@ -27,6 +37,21 @@ teacher_instruction = (
     "Doğrudan cevabı verip geçmek yerine öğrenciye konunun mantığını kavratacak şekilde adım adım rehberlik et."
 )
 
+# Seslendirme HTML/JavaScript Bileşeni Fonksiyonu
+def play_audio_script(text):
+    # Özel karakterleri ve tırnak işaretlerini temizleme
+    clean_text = text.replace("'", "\\'").replace('"', '\\"').replace('\n', ' ')
+    html_code = f"""
+    <script>
+    var msg = new SpeechSynthesisUtterance('{clean_text}');
+    msg.lang = 'tr-TR';
+    msg.rate = 1.0;
+    window.speechSynthesis.cancel(); // Önceki seslendirmeyi durdur
+    window.speechSynthesis.speak(msg);
+    </script>
+    """
+    components.html(html_code, height=0, width=0)
+
 # Sohbet Geçmişi Başlatma
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -46,7 +71,6 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz..."):
     # Yapay Zeka Yanıtı (Canlı Akış / Streaming)
     with st.chat_message("assistant"):
         def generate_response():
-            # Öncelikli olarak gemini-3.8-flash deneniyor
             models_to_try = ['gemini-3.8-flash', 'gemini-2.5-flash']
             
             for model_name in models_to_try:
@@ -58,14 +82,17 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz..."):
                     for chunk in response_stream:
                         if chunk.text:
                             yield chunk.text
-                    return  # Başarılı olursa döngüden çık
+                    return
                 except Exception as e:
-                    # 503 veya geçici sunucu hatalarında diğer modeli dene
                     continue
             
             yield "\n\n*Şu anda yapay zeka sunucularında yoğunluk var, lütfen birkaç saniye sonra tekrar deneyiniz.*"
 
         full_response = st.write_stream(generate_response)
+        
+        # Otomatik seslendirmeyi çalıştır
+        if full_response:
+            play_audio_script(full_response)
     
     # Yanıtı geçmişe ekle
     st.session_state.messages.append({"role": "assistant", "content": full_response})
