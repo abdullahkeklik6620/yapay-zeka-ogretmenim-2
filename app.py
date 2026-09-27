@@ -46,16 +46,24 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz..."):
     # Yapay Zeka Yanıtı (Canlı Akış / Streaming)
     with st.chat_message("assistant"):
         def generate_response():
-            try:
-                response_stream = client.models.generate_content_stream(
-                    model='gemini-3.8-flash',
-                    contents=f"{teacher_instruction}\n\nÖğrencinin Sorusu: {prompt}"
-                )
-                for chunk in response_stream:
-                    if chunk.text:
-                        yield chunk.text
-            except Exception as e:
-                yield f"\n\n*Hata oluştu: {e}*"
+            # Öncelikli olarak gemini-3.8-flash deneniyor
+            models_to_try = ['gemini-3.8-flash', 'gemini-2.5-flash']
+            
+            for model_name in models_to_try:
+                try:
+                    response_stream = client.models.generate_content_stream(
+                        model=model_name,
+                        contents=f"{teacher_instruction}\n\nÖğrencinin Sorusu: {prompt}"
+                    )
+                    for chunk in response_stream:
+                        if chunk.text:
+                            yield chunk.text
+                    return  # Başarılı olursa döngüden çık
+                except Exception as e:
+                    # 503 veya geçici sunucu hatalarında diğer modeli dene
+                    continue
+            
+            yield "\n\n*Şu anda yapay zeka sunucularında yoğunluk var, lütfen birkaç saniye sonra tekrar deneyiniz.*"
 
         full_response = st.write_stream(generate_response)
     
