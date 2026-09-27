@@ -1,5 +1,6 @@
 import streamlit as st
 from google import genai
+from PIL import Image
 import streamlit.components.v1 as components
 
 # Sayfa Yapılandırması
@@ -15,7 +16,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🎓 Yapay Zeka Özel Öğretmenim")
-st.write("Matematik, Fizik, Kimya, Biyoloji, Türkçe, Tarih... İstediğin her dersi doğrudan sorabilirsin!")
+st.write("Matematik, Fizik, Kimya, Biyoloji, Türkçe, Tarih... İstediğin her dersi yazabilir veya sorunun **fotoğrafını yükleyebilirsin!**")
 
 # API Key'i Streamlit Secrets'tan al
 api_key = st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None
@@ -32,21 +33,20 @@ client = genai.Client(api_key=api_key)
 # Genel Evrensel Öğretmen Talimatı
 teacher_instruction = (
     "Sen her branşta uzman, son derece sabırlı, cesaretlendirici ve Sokratik yöntem kullanan evrensel bir özel öğretmensin. "
-    "Öğrenci sana hangi dersten soru sorarsa sorsun (Matematik, Fizik, Kimya, Biyoloji, Türkçe, Edebiyat, Tarih, Coğrafya, İngilizce vb.), "
-    "sorunun hangi derse ait olduğunu otomatik olarak tespit et ve o branşın uzman öğretmeni üslubuyla yanıt ver. "
-    "Doğrudan cevabı verip geçmek yerine öğrenciye konunun mantığını kavratacak şekilde adım adım rehberlik et."
+    "Öğrenci sana metin olarak veya soru fotoğrafı yükleyerek ne sorarsa sorsun, sorunun hangi derse ait olduğunu tespit et ve o branşın uzman öğretmeni üslubuyla yanıt ver. "
+    "Fotoğraftaki soruyu dikkatlice analiz et, metinleri ve şekilleri tam oku. "
+    "Doğrudan tek kelimelik cevabı verip geçmek yerine öğrenciye konunun mantığını kavratacak şekilde adım adım rehberlik et."
 )
 
 # Seslendirme HTML/JavaScript Bileşeni Fonksiyonu
 def play_audio_script(text):
-    # Özel karakterleri ve tırnak işaretlerini temizleme
     clean_text = text.replace("'", "\\'").replace('"', '\\"').replace('\n', ' ')
     html_code = f"""
     <script>
     var msg = new SpeechSynthesisUtterance('{clean_text}');
     msg.lang = 'tr-TR';
     msg.rate = 1.0;
-    window.speechSynthesis.cancel(); // Önceki seslendirmeyi durdur
+    window.speechSynthesis.cancel();
     window.speechSynthesis.speak(msg);
     </script>
     """
@@ -61,37 +61,61 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# Fotoğraf Yükleme Alanı (Soru Sorma Girişinin Üstünde)
+uploaded_file = st.file_uploader("📸 Soru Fotoğrafı Yükle (İsteğe Bağlı):", type=["jpg", "jpeg", "png"])
+
 # Kullanıcı Soru Girişi (Chat Input)
-if prompt := st.chat_input("İstediğin dersten sorunu yaz..."):
+if prompt := st.chat_input("İstediğin dersten sorunu yaz veya fotoğraf yükleyip gönder..."):
+    
+    # Fotoğraf yüklendi mi kontrolü
+    image_obj = None
+    if uploaded_file is not None:
+        image_obj = Image.open(uploaded_file)
+        
     # Kullanıcı mesajını ekrana ve geçmişe ekle
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    user_content = prompt
+    if image_obj:
+        user_content = f"📸 [Fotoğraf Yüklendi]\n\n{prompt}"
+        st.session_state.messages.append({"role": "user", "content": user_content})
+        with st.chat_message("user"):
+            st.image(image_obj, caption="Yüklenen Soru Fotoğrafı", use_container_width=True)
+            st.markdown(prompt)
+    else:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
     # Yapay Zeka Yanıtı (Canlı Akış / Streaming)
     with st.chat_message("assistant"):
         def generate_response():
-            models_to_try = ['gemini-3.8-flash', 'gemini-2.5-flash']
+            models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
             
+            # İçerik hazırlığı (Metin veya Metin + Görsel)
+            contents_payload = [teacher_instruction, prompt]
+            if image_obj:
+                contents_payload.append(image_obj)
+            
+            last_error = None
             for model_name in models_to_try:
                 try:
                     response_stream = client.models.generate_content_stream(
                         model=model_name,
-                        contents=f"{teacher_instruction}\n\nÖğrencinin Sorusu: {prompt}"
+                        contents=contents_payload
                     )
                     for chunk in response_stream:
                         if chunk.text:
                             yield chunk.text
                     return
                 except Exception as e:
+                    last_error = e
                     continue
             
-            yield "\n\n*Şu anda yapay zeka sunucularında yoğunluk var, lütfen birkaç saniye sonra tekrar deneyiniz.*"
+            yield f"\n\n*Hata oluştu: {last_error}*"
 
         full_response = st.write_stream(generate_response)
         
-        # Otomatik seslendirmeyi çalıştır
-        if full_response:
+        # Yanıt başarıyla alındıysa seslendir
+        if full_response and not full_response.startswith("\n\n*Hata oluştu:"):
             play_audio_script(full_response)
     
     # Yanıtı geçmişe ekle
