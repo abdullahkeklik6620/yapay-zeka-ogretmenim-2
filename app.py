@@ -7,13 +7,14 @@ st.set_page_config(page_title="Yapay Zeka Özel Öğretmenim", page_icon="🎓",
 st.title("🎓 Yapay Zeka Özel Öğretmenim")
 st.write("Matematik, Fizik, Kimya, Biyoloji, Türkçe, Tarih... İstediğin her dersi doğrudan sorabilirsin!")
 
-# Yan Menü: Sadece API Key
-st.sidebar.header("⚙️ Ayarlar")
-api_key = st.sidebar.text_input("Google Gemini API Key Giriniz:", type="password")
+# API Key'i Streamlit Secrets'tan al
+api_key = st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None
 
 if not api_key:
-    st.info("Lütfen sol menüden Google AI Studio'dan aldığınız API Key'i giriniz.")
-    st.stop()
+    api_key = st.sidebar.text_input("Google Gemini API Key Giriniz:", type="password")
+    if not api_key:
+        st.info("Lütfen API Key giriniz veya Streamlit Secrets alanına ekleyiniz.")
+        st.stop()
 
 # GenAI İstemcisini Başlat
 client = genai.Client(api_key=api_key)
