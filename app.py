@@ -61,7 +61,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Fotoğraf Yükleme Alanı (Soru Sorma Girişinin Üstünde)
+# Fotoğraf Yükleme Alanı
 uploaded_file = st.file_uploader("📸 Soru Fotoğrafı Yükle (İsteğe Bağlı):", type=["jpg", "jpeg", "png"])
 
 # Kullanıcı Soru Girişi (Chat Input)
@@ -88,9 +88,10 @@ if prompt := st.chat_input("İstediğin dersten sorunu yaz veya fotoğraf yükle
     # Yapay Zeka Yanıtı (Canlı Akış / Streaming)
     with st.chat_message("assistant"):
         def generate_response():
-            models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
+            # Güncel SDK standart isimleri
+            models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash']
             
-            # İçerik hazırlığı (Metin veya Metin + Görsel)
+            # İçerik hazırlığı
             contents_payload = [teacher_instruction, prompt]
             if image_obj:
                 contents_payload.append(image_obj)
